@@ -195,7 +195,8 @@ class MusicService : Service(), MediaPlayer.OnCompletionListener,
             audioIndex = 0
             activeMusic = musicList!![audioIndex!!]
         } else {
-            activeMusic = musicList!![audioIndex!!.inc()] // ++audioIndex
+            audioIndex = audioIndex!! + 1
+            activeMusic = musicList!![audioIndex!!] // ++audioIndex
         }
 
         StorageUtil(applicationContext).storeAudioIndex(audioIndex!!)
@@ -211,15 +212,17 @@ class MusicService : Service(), MediaPlayer.OnCompletionListener,
     private fun skipToPrevious() {
         if (audioIndex == 0) {
             audioIndex = musicList!!.size - 1
+            activeMusic = musicList!![audioIndex!!]
         } else {
-            activeMusic = musicList!![audioIndex!!.dec()] // --audioIndex
+            audioIndex = audioIndex!! - 1
+            activeMusic = musicList!![audioIndex!!] // --audioIndex
         }
 
         StorageUtil(applicationContext).storeAudioIndex(audioIndex!!)
 
         stopMedia()
         mediaPlayer!!.reset()
-        initMediaSession()
+        initMediaPlayer()
     }
 
     @TargetApi(Build.VERSION_CODES.LOLLIPOP)
@@ -386,7 +389,7 @@ class MusicService : Service(), MediaPlayer.OnCompletionListener,
     }
 
     private fun resumeMedia() {
-        if (mediaPlayer!!.isPlaying) {
+        if (!mediaPlayer!!.isPlaying) {
             mediaPlayer?.seekTo(resumePosition!!)
             mediaPlayer?.start()
         }
