@@ -1,9 +1,14 @@
 package com.example.anhptt.playmusicexample
 
 import android.Manifest
-import android.content.*
+import android.content.ComponentName
+import android.content.Context
+import android.content.Intent
+import android.content.ServiceConnection
 import android.content.pm.PackageManager
 import android.database.Cursor
+import android.graphics.BitmapFactory
+import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -16,24 +21,23 @@ import android.widget.Toast
 import com.example.anhptt.playmusicexample.adapter.MusicAdapter
 import com.example.anhptt.playmusicexample.music.Music
 import com.example.anhptt.playmusicexample.service.MusicService
+import com.example.anhptt.playmusicexample.storage.StorageUtil
 import kotlinx.android.synthetic.main.activity_main.*
-import android.media.MediaMetadataRetriever
-import android.widget.LinearLayout
-import android.R.attr.data
-import android.graphics.BitmapFactory
-import android.graphics.Bitmap
 
 
 class MainActivity : AppCompatActivity() {
 
     companion object {
         const val REQUEST_READ_AND_WRITE_EXTERNAL_CODE: Int = 1111
+        const val BROADCAST_PLAY_NEW_AUDIO = "PLAY_NEW_AUDIO_RECEIVER"
+        const val MUSIC_KEY = "MUSIC_KEY"
     }
 
     private lateinit var mListMusic: MutableList<Music>
     private lateinit var mAdapter: MusicAdapter
     private var musicService: MusicService? = null
     private var serviceBound = false
+    private lateinit var storageUtil: StorageUtil
     private val serviceConnection = object : ServiceConnection {
 
         override fun onServiceConnected(p0: ComponentName?, service: IBinder?) {
@@ -47,36 +51,34 @@ class MainActivity : AppCompatActivity() {
             serviceBound = false
         }
     }
-    private val becomingNoisyReceiver = object : BroadcastReceiver() {
-        override fun onReceive(p0: Context?, p1: Intent?) {
 
-        }
-    }
-
-    private fun playMedia(media: String) {
-        if (!serviceBound) {
-            val intent = Intent(this@MainActivity, MusicService::class.java)
-            intent.putExtra("media", media)
-            startService(intent)
-            bindService(intent, serviceConnection, Context.BIND_AUTO_CREATE)
-        } else {
-            val intent = Intent("SWITCH_TO_NEXT_SONG_ACTION")
-            intent.putExtra("media", media)
-            sendBroadcast(intent)
-        }
-    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
         mListMusic = mutableListOf()
+        storageUtil = StorageUtil(this@MainActivity)
         mAdapter = MusicAdapter(this@MainActivity, mListMusic)
         listMusic.adapter = mAdapter
         requestPermission()
         listMusic.setOnItemClickListener { _, _, position, _ ->
             run {
-                playMedia(mListMusic[position].fullPath!!)
+                playMusic(position)
             }
+        }
+    }
+
+    private fun playMusic(audioIndex: Int) {
+        if (!serviceBound) {
+            val intent = Intent(this@MainActivity, MusicService::class.java)
+            intent.putExtra(MUSIC_KEY, mListMusic[audioIndex].fullPath)
+            startService(intent)
+            bindService(intent, serviceConnection, Context.BIND_AUTO_CREATE)
+            storageUtil.storeAudioIndex(audioIndex)
+        } else {
+            storageUtil.storeAudioIndex(audioIndex)
+            val intent = Intent(BROADCAST_PLAY_NEW_AUDIO)
+            sendBroadcast(intent)
         }
     }
 
@@ -93,6 +95,7 @@ class MainActivity : AppCompatActivity() {
     override fun onDestroy() {
         super.onDestroy()
         if (serviceBound) {
+            unbindService(serviceConnection)
             musicService?.stopSelf()
         }
     }
@@ -130,6 +133,7 @@ class MainActivity : AppCompatActivity() {
             cursor.close()
         }
         mAdapter.notifyDataSetChanged()
+        storageUtil.storeAudio(mListMusic)
     }
 
     private fun isSdPresent(): Boolean {
