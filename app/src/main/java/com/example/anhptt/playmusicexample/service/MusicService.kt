@@ -488,9 +488,7 @@ class MusicService : Service(), MediaPlayer.OnCompletionListener,
             telephonyManager?.listen(phoneStateListener,
                     PhoneStateListener.LISTEN_NONE)
         }
-        //
-        //removeNotification()
-
+        removeNotification()
         //clear cache
         StorageUtil(this).clearCachedAudioPlayList()
     }
